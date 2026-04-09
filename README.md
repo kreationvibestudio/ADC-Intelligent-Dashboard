@@ -96,4 +96,3 @@ Same behavior as manual fetch. Intended for Vercel Cron.
 ## Notes
 
 - The app uses the **Supabase service role key** on the server. Never expose it to the browser.
-
