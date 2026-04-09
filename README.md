@@ -1,36 +1,99 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## ADC Intelligence Dashboard (MVP)
 
-## Getting Started
+Production-ready MVP that aggregates news and online information about **African Democratic Congress (ADC Nigeria)** and displays it on a clean dashboard.
 
-First, run the development server:
+### Features
+
+- **RSS ingestion**: Google News RSS for `ADC Nigeria`
+- **Storage**: Supabase Postgres table `articles` (dedupe by `link`)
+- **Enrichment**:
+  - Summary: OpenAI-compatible (optional) with a safe fallback
+  - Sentiment: lightweight rule-based (`positive | neutral | negative`)
+- **Dashboard**: cards + keyword search + sentiment filter
+- **Background refresh**: Vercel Cron every 3 hours (`/api/cron/fetch`)
+
+### Tech stack
+
+- Next.js (App Router) + TypeScript + Tailwind
+- Supabase (Postgres)
+- Vercel (hosting + cron)
+
+## Setup
+
+### 1) Create Supabase table
+
+In Supabase SQL Editor, run:
+
+`supabase/schema.sql`
+
+### 2) Configure environment variables
+
+Copy `.env.example` to `.env.local` and fill in:
+
+- **SUPABASE_URL**
+- **SUPABASE_ANON_KEY**
+- **SUPABASE_SERVICE_ROLE_KEY**
+- **CRON_SECRET** (recommended)
+
+Optional (summarization):
+
+- **OPENAI_API_KEY**
+- **OPENAI_BASE_URL** (defaults to `https://api.openai.com/v1`)
+- **OPENAI_MODEL** (defaults to `gpt-4o-mini`)
+
+### 3) Run locally
+
+From `adc-intelligence-dashboard/`:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 4) Ingest data (manual)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Trigger ingestion (protected by `CRON_SECRET` if set):
 
-## Learn More
+```bash
+curl -X POST "http://localhost:3000/api/fetch" \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
 
-To learn more about Next.js, take a look at the following resources:
+Then refresh the dashboard.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## API
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### `GET /api/articles`
 
-## Deploy on Vercel
+Query params:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **q**: keyword search in title/summary
+- **sentiment**: `positive | neutral | negative`
+- **limit**: `1..100` (default 50)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### `POST /api/fetch`
+
+Manually triggers RSS ingest + enrichment.
+
+Auth:
+
+- `Authorization: Bearer <CRON_SECRET>` (recommended)
+- or `?secret=<CRON_SECRET>`
+
+### `GET /api/cron/fetch`
+
+Same behavior as manual fetch. Intended for Vercel Cron.
+
+## Deploy to Vercel
+
+1. Push repo to GitHub
+2. Import into Vercel
+3. Set env vars in Vercel project settings (same as `.env.local`)
+4. Cron schedule is defined in `vercel.json` (every 3 hours)
+
+## Notes
+
+- The app uses the **Supabase service role key** on the server. Never expose it to the browser.
+
